@@ -22,8 +22,8 @@ This project implements a Retrieval-Augmented Generation (RAG) system using MLX,
 
 1. Clone the repository:
 ```bash
-git clone [your-repo-url]
-cd [your-repo-name]
+git clone https://github.com/avlemos/lllm-rag-mlx.git
+cd lllm-rag-mlx
 ```
 
 2. Create and activate a virtual environment:
