@@ -16,6 +16,7 @@ numpy==2.2.1
 packaging==24.2
 pillow==11.1.0
 protobuf==5.29.3
+PyPDF2==3.0.1
 PyYAML==6.0.2
 regex==2024.11.6
 requests==2.32.3
