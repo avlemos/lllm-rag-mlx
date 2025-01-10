@@ -332,11 +332,28 @@ def main():
             print(f"Processing {len(documents)} new documents")
             rag.add_documents(documents)
         
-        # Generate a response
-        query = "What can you say about iText?"
-        print(f"Generating response for query: {query}")
-        response = rag.generate_response(query)
-        print(f"Response: {response}")
+        # # Generate a response
+        # query = "What can you say about iText?"
+        # print(f"Generating response for query: {query}")
+        # response = rag.generate_response(query)
+        # print(f"Response: {response}")
+        
+        print("\n\nWelcome to the interactive session. Type 'exit' to quit.")
+        while True:
+            # Prompt the user for a query
+            query = input("Enter your query (or exit): ")
+            
+            # Check if the user wants to exit
+            if query.lower() == 'exit':
+                print("Exiting the session. Goodbye!")
+                break
+            
+            # Generate a response
+            print(f"Generating response for query: {query}")
+            response = rag.generate_response(query)
+            print("\n##################################################")
+            print(f"Response: {response}")
+            print("##################################################\n")
         
     except Exception as e:
         print(f"An error occurred: {str(e)}")

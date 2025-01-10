@@ -72,6 +72,8 @@ response = rag.generate_response(query)
 print(response)
 ```
 
+The file rag_system.py also contains an example usage (as the following above), with an interactive session instead
+
 ## Configuration Options
 
 You can customize the system behavior through several parameters:
