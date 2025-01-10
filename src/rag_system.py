@@ -51,36 +51,88 @@ class DocumentStore:
     
     def is_document_processed(self, file_path: str) -> bool:
         """Check if document is already processed and up to date"""
-        if not os.path.exists(file_path):
-            return False
+        try:
+            # Normalize the path to handle spaces and special characters
+            file_path = os.path.normpath(os.path.abspath(file_path))
             
-        file_hash = self.get_file_hash(file_path)
-        last_modified = datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
-        
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                'SELECT id FROM documents WHERE file_path = ? AND file_hash = ?',
-                (file_path, file_hash)
-            )
-            return cursor.fetchone() is not None
+            if not os.path.exists(file_path):
+                print(f"File does not exist: {file_path}")
+                return False
+                
+            file_hash = self.get_file_hash(file_path)
+            last_modified = datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
+            
+            print(f"\nChecking cache for: {file_path}")
+            print(f"Normalized path: {file_path}")
+            print(f"File hash: {file_hash}")
+            print(f"Last modified: {last_modified}")
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute(
+                    '''
+                    SELECT id, file_hash, last_modified 
+                    FROM documents 
+                    WHERE file_path = ?
+                    ''',
+                    (file_path,)
+                )
+                result = cursor.fetchone()
+                
+                if result:
+                    db_id, db_hash, db_modified = result
+                    print(f"Found in database with path: {file_path}")
+                    print(f"DB hash: {db_hash}")
+                    print(f"DB last modified: {db_modified}")
+                    
+                    is_cached = (file_hash == db_hash)
+                    print(f"Cache status: {'Hit' if is_cached else 'Miss (hash mismatch)'}")
+                    return is_cached
+                else:
+                    print(f"Not found in database: {file_path}")
+                    return False
+                    
+        except Exception as e:
+            print(f"Error checking document cache: {str(e)}")
+            return False
             
     def store_document(self, file_path: str, chunks: List[str]):
         """Store document information and chunks"""
-        file_hash = self.get_file_hash(file_path)
-        last_modified = datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
-        
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute('''
-                INSERT OR REPLACE INTO documents 
-                (file_path, file_hash, last_modified, processed_date, chunks)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (
-                file_path,
-                file_hash,
-                last_modified,
-                datetime.now().isoformat(),
-                json.dumps(chunks)
-            ))
+        try:
+            # Normalize the path
+            file_path = os.path.normpath(os.path.abspath(file_path))
+            
+            file_hash = self.get_file_hash(file_path)
+            last_modified = datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
+            
+            print(f"\nStoring document: {file_path}")
+            print(f"Normalized path: {file_path}")
+            print(f"Hash: {file_hash}")
+            print(f"Last modified: {last_modified}")
+            print(f"Number of chunks: {len(chunks)}")
+            
+            with sqlite3.connect(self.db_path) as conn:
+                # First, remove any existing entries for this file
+                conn.execute('DELETE FROM embeddings WHERE document_id IN (SELECT id FROM documents WHERE file_path = ?)', (file_path,))
+                conn.execute('DELETE FROM documents WHERE file_path = ?', (file_path,))
+                
+                # Then insert the new document
+                cursor = conn.execute('''
+                    INSERT INTO documents 
+                    (file_path, file_hash, last_modified, processed_date, chunks)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (
+                    file_path,
+                    file_hash,
+                    last_modified,
+                    datetime.now().isoformat(),
+                    json.dumps(chunks)
+                ))
+                print(f"Document stored with ID: {cursor.lastrowid}")
+                
+        except Exception as e:
+            print(f"Error storing document: {str(e)}")
+            raise
+
             
     def store_embeddings(self, file_path: str, chunk_embeddings: List[Tuple[str, np.ndarray]]):
         """Store embeddings for document chunks"""
@@ -151,6 +203,7 @@ class RAGSystem:
         try:
             reader = PdfReader(pdf_path)
             text = ""
+            print("process_pdf: ", pdf_path)
             for page in reader.pages:
                 text += page.extract_text() + "\n"
             return text.strip()
@@ -158,23 +211,33 @@ class RAGSystem:
             print(f"Error processing {pdf_path}: {str(e)}")
             return ""
     
-    def load_pdfs_from_folder(self, folder_path: str) -> List[str]:
+    def load_pdfs_from_folder(self, folder_path: str) -> List[Tuple[str, str]]:
         """Load all PDFs from a specified folder, using cache when possible"""
+        # Normalize the folder path
+        folder_path = os.path.normpath(os.path.abspath(folder_path))
         pdf_files = glob.glob(os.path.join(folder_path, "*.pdf"))
+        
         if not pdf_files:
             raise ValueError(f"No PDF files found in {folder_path}")
             
         documents = []
         
+        print(f"\nFound {len(pdf_files)} PDF files in {folder_path}")
+        
         for pdf_file in pdf_files:
-            if self.store.is_document_processed(pdf_file):
-                print(f"Using cached version of {pdf_file}")
+            # Normalize the file path to handle spaces and special characters
+            normalized_path = os.path.normpath(os.path.abspath(pdf_file))
+            print(f"\nProcessing file: {pdf_file}")
+            print(f"Normalized path: {normalized_path}")
+            
+            if self.store.is_document_processed(normalized_path):
+                print(f"Using cached version of {normalized_path}")
                 continue
                 
-            print(f"Processing new file: {pdf_file}")
-            text = self.process_pdf(pdf_file)
+            print(f"Processing new file: {normalized_path}")
+            text = self.process_pdf(normalized_path)
             if text:
-                documents.append((pdf_file, text))
+                documents.append((normalized_path, text))
                 
         return documents
 
@@ -270,7 +333,7 @@ def main():
             rag.add_documents(documents)
         
         # Generate a response
-        query = "What are the main topics covered in these documents?"
+        query = "What can you say about iText?"
         print(f"Generating response for query: {query}")
         response = rag.generate_response(query)
         print(f"Response: {response}")
