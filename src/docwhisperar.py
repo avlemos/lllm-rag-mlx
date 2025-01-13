@@ -1,37 +1,57 @@
-import sys
+import sys, os, time
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, 
                            QPushButton, QVBoxLayout, QWidget, QFileDialog, QCheckBox, QSplashScreen, QSystemTrayIcon, QMenu)
 from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal, QTimer, QByteArray
 from PyQt6.QtGui import QPixmap, QPainter, QIcon, QAction
 from PyQt6.QtSvg import QSvgRenderer
-import os
 from rag_system import RAGSystem
 import threading
 from Foundation import NSBundle
 from AppKit import NSApplication, NSApp
 
+# Path to the model cache directory
+cache_dir = os.path.expanduser("~/.cache/huggingface/hub/models--mlx-community--Llama-3.2-3B-Instruct-4bit/blobs")
+blobs = "82bfe829fe45ccb46316f2c958c756424381b7a6694f8951fa8cd163a6feea77.incomplete"
 
-class DynamicSplashScreen(QSplashScreen):
-    def __init__(self):
-        super().__init__()
-        self.svg_template = open('splash_template.svg', 'r').read()
-        self.update_message("Starting...")
-        
-    def update_message(self, message):
-        # Update SVG with new message
-        svg_content = self.svg_template.replace("{loading_text}", message)
-        
-        # Convert SVG to QPixmap
-        renderer = QSvgRenderer(QByteArray(svg_content.encode()))
-        pixmap = QPixmap(600, 400)  # Match SVG viewBox size
-        pixmap.fill(Qt.GlobalColor.transparent)
-        painter = QPainter(pixmap)
-        renderer.render(painter)
-        painter.end()
-        
-        # Update splash screen with new pixmap
-        self.setPixmap(pixmap)
-        self.repaint()
+class DocWhispererApp(QApplication):
+    def __init__(self, argv):
+        super().__init__(argv)
+
+        # Set application name and organization
+        self.setApplicationName("DocWhisperer")
+        self.setOrganizationName("DocWhisperer")
+
+        # Show the splash screen
+        self.splash = DynamicSplashScreen()
+        self.splash.show()
+
+        # Process events to ensure the splash is displayed
+        self.processEvents()
+
+        # Initialize the RAGSystem in a separate thread
+        self.worker_thread = QThread()
+        self.worker = RAGSystemWorker()
+        self.worker.moveToThread(self.worker_thread)
+
+        # Connect signals to update the splash screen and handle completion
+        self.worker.progress.connect(self.update_splash_message)
+        self.worker.finished.connect(self.on_rag_system_initialized)
+
+        # Start the worker thread
+        self.worker_thread.started.connect(self.worker.run)
+        self.worker_thread.start()
+
+    def update_splash_message(self, message):
+        """Update the splash screen with progress messages."""
+        self.splash.update_message(message)
+        self.processEvents()
+
+    def on_rag_system_initialized(self, rag_system):
+        """Handle completion of RAGSystem initialization."""
+        self.rag_system = rag_system
+        self.splash.finish(None)  # Close the splash screen
+        print("RAG System is ready!")  # Replace with actual app logic
+
 
 class QueryWorker(QObject):
     finished = pyqtSignal(str)
@@ -204,7 +224,7 @@ class DocWhispererApp(QApplication):
 
     def update_splash_message(self, message):
         self.splash.update_message(message)
-        self.processEvents()
+        # self.processEvents()
 
     def on_rag_system_initialized(self, rag_system):
         self.rag_system = rag_system
@@ -274,30 +294,117 @@ class DocWhispererApp(QApplication):
 
 
 class RAGSystemWorker(QObject):
-    finished = pyqtSignal(object)
-    progress = pyqtSignal(str)
+    finished = pyqtSignal(object)  # Emits when the RAGSystem is ready
+    progress = pyqtSignal(str)     # Emits progress updates
+
+    def __init__(self):
+        super().__init__()
+        self._running = True  # Control flag for the thread
 
     def run(self):
+        # cache_dir = os.path.expanduser("~/.cache/mlx-lm/models/")
+        # model_name = "Llama-3.2-3B-Instruct-4bit"
+        model_path = os.path.join(cache_dir, blobs)
+
+
+        # Start monitoring in a separate thread
+        if not os.path.exists(cache_dir):
+            self._running = True
+            self.monitoring_thread = threading.Thread(target=self.monitor_progress, args=(model_path,))
+            self.monitoring_thread.start()  # Start the monitor in a separate thread
+
         try:
-            # Emit progress updates during initialization
-            self.progress.emit("Loading model...")
-            
+            # Emit initial progress
+            if not os.path.exists(cache_dir):
+                print("Downloading & Loading the model...")
+                self.progress.emit("Downloading & Loading the model...")
+            else:
+                print("Loading the model...")
+                self.progress.emit("Loading the model...")
+
             # Initialize RAG system
+            print("Initializing RAG system...")
             rag_system = RAGSystem()
-            
-            # Update progress for different initialization steps
+
+            # Emit progress updates during initialization
             self.progress.emit("Loading document cache...")
-            rag_system._load_existing_document_cache(db_path=os.path.expanduser("~/Library/Application Support/DocWhisperer/rag_cache.db"))
-            
-            
+            rag_system._load_existing_document_cache(
+                db_path=os.path.expanduser("~/Library/Application Support/DocWhisperer/rag_cache.db")
+            )
+
             self.progress.emit("Load existing embeddings from storage into FAISS index...")
             rag_system._load_existing_embeddings()
-            
+
+            # Notify completion
             self.progress.emit("Ready!")
             self.finished.emit(rag_system)
-            
+
         except Exception as e:
             self.progress.emit(f"Error during initialization: {str(e)}")
+        finally:
+            # Stop the monitoring thread
+            self._running = False
+            if hasattr(self, "monitoring_thread") and self.monitoring_thread is not None:
+                self.monitoring_thread.join()  # Ensure the thread stops gracefully
+
+    def monitor_progress(self, model_path):
+        """Monitors model download progress and emits updates."""
+        while self._running:
+            if os.path.exists(model_path):
+                size = os.path.getsize(model_path)
+                print(f"Downloaded: {size / 1e6:.2f} MB")
+                self.progress.emit(f"Downloading: {size / 1e6:.2f} MB of 1803.55 MB")
+                if size == 1803.55:
+                    break
+            else:
+                print("Waiting for download to start...")
+                self.progress.emit("Waiting for the download to start...")
+            time.sleep(1)
+
+    def stop(self):
+        self._running = False
+
+class DynamicSplashScreen(QSplashScreen):
+    def __init__(self):
+        super().__init__()
+        self.svg_template = open('splash_template.svg', 'r').read()
+        self.update_message("Starting...")
+
+    def update_message(self, message):
+        """Update the splash screen with a new message."""
+        svg_content = self.svg_template.replace("{loading_text}", message)
+        renderer = QSvgRenderer(QByteArray(svg_content.encode()))
+        pixmap = QPixmap(600, 400)  # Match the SVG size
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        renderer.render(painter)
+        painter.end()
+        self.setPixmap(pixmap)
+        self.repaint()
+
+
+class ProgressMonitor(QObject):
+    progress = pyqtSignal(str)  # Signal to emit progress updates
+
+    def __init__(self, model_path):
+        super().__init__()
+        self.model_path = model_path
+        self._running = False
+
+    def monitor(self):
+        self._running = True
+        while self._running:
+            if os.path.exists(self.model_path):
+                size = os.path.getsize(self.model_path)
+                print(f"Downloaded: {size / 1e6:.2f} MB")
+                self.progress.emit(f"Downloading: {size / 1e6:.2f} MB")
+            else:
+                print("Waiting for download to start...")
+                self.progress.emit("Waiting for the download to start...")
+            time.sleep(1)
+
+    def stop(self):
+        self._running = False
 
 def main():
     # Create and run the application

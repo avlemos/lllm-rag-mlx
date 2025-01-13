@@ -9,7 +9,10 @@ from setuptools import setup
 
 APP = ['docwhisperar.py']
 DATA_FILES = ["icon.png", "splash_template.svg"]
-OPTIONS = {}
+OPTIONS = {
+    'iconfile':'icon.icns',
+    'plist': {'CFBundleShortVersionString':'0.1.0',}
+}
 
 setup(
     app=APP,
