@@ -1,12 +1,21 @@
 import rumps
 import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, 
-                           QPushButton, QVBoxLayout, QWidget, QFileDialog, QCheckBox)
-from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal
+                           QPushButton, QVBoxLayout, QWidget, QFileDialog, QCheckBox, QSplashScreen)
+from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal, QTimer
+from PyQt6.QtGui import QPixmap
 import os
 from rag_system import RAGSystem
 import threading
+from Foundation import NSBundle
+from AppKit import NSApplication, NSApp
 
+# Initialize NSApplication
+NSApplication.sharedApplication()
+# Hide the Dock icon
+info = NSBundle.mainBundle().infoDictionary()
+info["LSBackgroundOnly"] = "1"
+NSApp.setActivationPolicy_(1)  # NSApplicationActivationPolicyAccessory
 
 class QueryWorker(QObject):
     finished = pyqtSignal(str)
@@ -34,7 +43,6 @@ class QueryWindow(QMainWindow):
     def init_ui(self):
         self.setWindowTitle('DocWhisperer')
         self.setGeometry(100, 100, 800, 600)
-        self.setAttribute(Qt.WindowType.icon)
         
         # Create central widget and layout
         central_widget = QWidget()
@@ -59,7 +67,8 @@ class QueryWindow(QMainWindow):
         layout.addWidget(self.submit_button)
         
         # Create ignore documents checkbox
-        self.ignore_documents_checkbox = QCheckBox("Ignore Documents")
+        # document_count = self.rag_system.get_document_count()
+        self.ignore_documents_checkbox = QCheckBox(f"Ignore Documents")
         layout.addWidget(self.ignore_documents_checkbox)
         
         # Set window flags to keep it on top
@@ -100,24 +109,45 @@ class DocWhispererApp(rumps.App):
     def __init__(self):
         super().__init__("DocWhisperer", icon="icon.png")
         
-        # Initialize RAG system
-        self.rag_system = RAGSystem(db_path=os.path.expanduser("~/Library/Application Support/DocWhisperer/rag_cache.db"))
-        
         # Create application support directory
         os.makedirs(os.path.expanduser("~/Library/Application Support/DocWhisperer"), exist_ok=True)
         
-        # Initialize query window
+        # Initialize QApplication
         self.app = QApplication(sys.argv)
+        
+        # Show splash screen
+        splash_pix = QPixmap('splash.png')  # Path to your splash image
+        self.splash = QSplashScreen(splash_pix, Qt.WindowType.WindowStaysOnTopHint)
+        self.splash.show()
+        
+        # Initialize RAG system in a separate thread
+        self.thread = QThread()
+        self.worker = RAGSystemWorker()
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.on_rag_system_initialized)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.start()
+        
+    def on_rag_system_initialized(self, rag_system):
+        self.rag_system = rag_system
         self.query_window = QueryWindow(self.rag_system)
         
         # Set up menu items
+        self.menu.clear()
         self.menu = [
             rumps.MenuItem("Ask Question", callback=self.show_query_window),
             rumps.MenuItem("Add Documents", callback=self.add_documents),
-            rumps.MenuItem("List Documents", callback=self.list_documents),
+            # rumps.MenuItem("List Documents", callback=self.list_documents),
             None,  # Separator
-            rumps.MenuItem("About", callback=self.show_about)
+            rumps.MenuItem("About", callback=self.show_about),
+            rumps.MenuItem("Quit", callback=self.quit_app)  # New Quit menu item
         ]
+        
+        # Close splash screen
+        self.splash.close()
         
     @rumps.clicked("Ask Question")
     def show_query_window(self, _):
@@ -159,7 +189,7 @@ class DocWhispererApp(rumps.App):
     @rumps.clicked("List Documents")
     def list_documents(self, _):
         try:
-            num_documents = self.rag_system.get_document_count()
+            num_documents = self.rag_system.get_document_count()  # Assuming this method exists
             rumps.notification(
                 title="DocWhisperer",
                 subtitle="Documents Available",
@@ -176,8 +206,19 @@ class DocWhispererApp(rumps.App):
     def show_about(self, _):
         rumps.alert(
             title="About DocWhisperer",
+            icon_path="icon.png",
             message="DocWhisperer is an intelligent document assistant that helps you interact with your PDF documents using advanced AI technology."
         )
+
+    def quit_app(self, _):
+        rumps.quit_application()
+
+class RAGSystemWorker(QObject):
+    finished = pyqtSignal(object)
+
+    def run(self):
+        rag_system = RAGSystem(db_path=os.path.expanduser("~/Library/Application Support/DocWhisperer/rag_cache.db"))
+        self.finished.emit(rag_system)
 
 def main():
     DocWhispererApp().run()
