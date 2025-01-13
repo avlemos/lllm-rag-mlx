@@ -16,7 +16,12 @@ numpy==2.2.1
 packaging==24.2
 pillow==11.1.0
 protobuf==5.29.3
+pyobjc-core==10.3.2
+pyobjc-framework-Cocoa==10.3.2
 PyPDF2==3.0.1
+PyQt6==6.8.0
+PyQt6-Qt6==6.8.1
+PyQt6_sip==13.9.1
 PyYAML==6.0.2
 regex==2024.11.6
 requests==2.32.3

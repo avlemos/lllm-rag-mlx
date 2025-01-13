@@ -42,7 +42,7 @@
   <text x="300" y="280" 
         text-anchor="middle" 
         fill="#fff" 
-        style="font-family: Arial, sans-serif; font-size: 36px; font-weight: bold">
+        style="font-family: Arial; font-size: 36px; font-weight: bold">
     DocWhisperer
   </text>
   
@@ -50,7 +50,7 @@
   <text id="loading-text" x="300" y="320" 
         text-anchor="middle" 
         fill="#fff" 
-        style="font-family: Arial, sans-serif; font-size: 18px">
+        style="font-family: Arial; font-size: 18px">
     {loading_text}
   </text>
 </svg>

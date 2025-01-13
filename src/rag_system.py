@@ -171,9 +171,11 @@ class DocumentStore:
 class RAGSystem:
     def __init__(self, model_name: str = "mlx-community/Llama-3.2-3B-Instruct-4bit", db_path: str = "rag_cache.db"):
         # Load MLX model and tokenizer
+        print("Loading MLX model and tokenizer...")
         self.model, self.tokenizer = load(model_name)
         
         # Initialize sentence transformer for embeddings
+        print("Initializing SentenceTransformer...")
         self.encoder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
         
         # Initialize FAISS index
@@ -329,6 +331,8 @@ def main():
     try:
         # Initialize RAG system
         rag = RAGSystem(db_path="rag_cache.db")
+        rag._load_existing_document_cache()
+        rag._load_existing_embeddings
         
         # Load PDFs from folder
         pdf_folder = "../data/"  # Update this path

@@ -1,4 +1,3 @@
-import rumps
 import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, 
                            QPushButton, QVBoxLayout, QWidget, QFileDialog, QCheckBox, QSplashScreen, QSystemTrayIcon, QMenu)
@@ -10,13 +9,6 @@ from rag_system import RAGSystem
 import threading
 from Foundation import NSBundle
 from AppKit import NSApplication, NSApp
-
-# # Initialize NSApplication
-# NSApplication.sharedApplication()
-# # Hide the Dock icon
-# info = NSBundle.mainBundle().infoDictionary()
-# info["LSBackgroundOnly"] = "1"
-# NSApp.setActivationPolicy_(1)  # NSApplicationActivationPolicyAccessory
 
 
 class DynamicSplashScreen(QSplashScreen):
@@ -226,7 +218,7 @@ class DocWhispererApp(QApplication):
             "Application is ready to use",
             QSystemTrayIcon.MessageIcon.Information
         )
-
+        
     def show_query_window(self):
         if self.query_window:
             self.query_window.show()
@@ -274,8 +266,6 @@ class DocWhispererApp(QApplication):
             QSystemTrayIcon.MessageIcon.Information
         )
 
-    def quit_app(self, _):
-        rumps.quit_application()
 
 class RAGSystemWorker(QObject):
     finished = pyqtSignal(object)
