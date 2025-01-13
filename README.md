@@ -122,6 +122,17 @@ Error messages will guide you to the source of any problems.
 
 - Apending "just provide a general answer", will make it ignore existing documents
 
+## Distribution
+
+
+Running:
+
+```bash
+python setup.py py2app -A
+```
+
+will create a distributable Application
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit pull requests.

@@ -4,3 +4,4 @@ data/*
 rag_cache.db
 .eggs/
 rag_system.cpython*
+dist/

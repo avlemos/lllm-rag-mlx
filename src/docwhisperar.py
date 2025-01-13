@@ -14,7 +14,7 @@ from AppKit import NSApplication, NSApp
 class DynamicSplashScreen(QSplashScreen):
     def __init__(self):
         super().__init__()
-        self.svg_template = open('src/splash_template.svg', 'r').read()
+        self.svg_template = open('splash_template.svg', 'r').read()
         self.update_message("Starting...")
         
     def update_message(self, message):
@@ -118,8 +118,14 @@ class QueryWindow(QMainWindow):
             self.thread.start()
 
     def update_response(self, response):
-        self.response_display.setPlainText(response)
+        self.response_display.setPlainText(self.remove_prefix(response))
         self.submit_button.setEnabled(True)
+        
+    def remove_prefix(self, s):
+        prefix = "According to the context, "
+        if s.startswith(prefix):
+            return s[len(prefix):]  # Remove the prefix
+        return s  # Return the original string if it doesn't start with the prefix
 
 class DocWhispererApp(QApplication):
     def __init__(self, argv):
@@ -168,7 +174,7 @@ class DocWhispererApp(QApplication):
     def init_tray(self):
         # Create system tray icon
         self.tray = QSystemTrayIcon(self)
-        icon = QIcon('src/icon.png')
+        icon = QIcon('icon.png')
         self.tray.setIcon(icon)
         self.tray.setVisible(True)
         
