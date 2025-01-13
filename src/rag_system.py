@@ -241,6 +241,11 @@ class RAGSystem:
                 
         return documents
 
+    def get_document_count(self):
+        """Retrieve the number of documents in the index"""
+        return self.documents.count()
+
+
     def add_documents(self, documents: List[Tuple[str, str]], chunk_size: int = 512):
         """Add documents to the RAG system with chunking and storage"""
         if not documents:

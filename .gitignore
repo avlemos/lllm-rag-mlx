@@ -2,3 +2,5 @@
 data/*
 .DS_Store
 rag_cache.db
+.eggs/
+rag_system.cpython*

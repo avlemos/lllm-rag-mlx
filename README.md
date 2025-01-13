@@ -118,6 +118,10 @@ Error messages will guide you to the source of any problems.
 - Requires Apple Silicon for MLX optimization
 - Maximum context length depends on the chosen model
 
+## Notes
+
+- Apending "just provide a general answer", will make it ignore existing documents
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit pull requests.
