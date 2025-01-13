@@ -1,21 +1,45 @@
 import rumps
 import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, 
-                           QPushButton, QVBoxLayout, QWidget, QFileDialog, QCheckBox, QSplashScreen)
-from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal, QTimer
-from PyQt6.QtGui import QPixmap
+                           QPushButton, QVBoxLayout, QWidget, QFileDialog, QCheckBox, QSplashScreen, QSystemTrayIcon, QMenu)
+from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal, QTimer, QByteArray
+from PyQt6.QtGui import QPixmap, QPainter, QIcon, QAction
+from PyQt6.QtSvg import QSvgRenderer
 import os
 from rag_system import RAGSystem
 import threading
 from Foundation import NSBundle
 from AppKit import NSApplication, NSApp
 
-# Initialize NSApplication
-NSApplication.sharedApplication()
-# Hide the Dock icon
-info = NSBundle.mainBundle().infoDictionary()
-info["LSBackgroundOnly"] = "1"
-NSApp.setActivationPolicy_(1)  # NSApplicationActivationPolicyAccessory
+# # Initialize NSApplication
+# NSApplication.sharedApplication()
+# # Hide the Dock icon
+# info = NSBundle.mainBundle().infoDictionary()
+# info["LSBackgroundOnly"] = "1"
+# NSApp.setActivationPolicy_(1)  # NSApplicationActivationPolicyAccessory
+
+
+class DynamicSplashScreen(QSplashScreen):
+    def __init__(self):
+        super().__init__()
+        self.svg_template = open('src/splash_template.svg', 'r').read()
+        self.update_message("Starting...")
+        
+    def update_message(self, message):
+        # Update SVG with new message
+        svg_content = self.svg_template.replace("{loading_text}", message)
+        
+        # Convert SVG to QPixmap
+        renderer = QSvgRenderer(QByteArray(svg_content.encode()))
+        pixmap = QPixmap(600, 400)  # Match SVG viewBox size
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        renderer.render(painter)
+        painter.end()
+        
+        # Update splash screen with new pixmap
+        self.setPixmap(pixmap)
+        self.repaint()
 
 class QueryWorker(QObject):
     finished = pyqtSignal(str)
@@ -105,57 +129,114 @@ class QueryWindow(QMainWindow):
         self.response_display.setPlainText(response)
         self.submit_button.setEnabled(True)
 
-class DocWhispererApp(rumps.App):
-    def __init__(self):
-        super().__init__("DocWhisperer", icon="icon.png")
+class DocWhispererApp(QApplication):
+    def __init__(self, argv):
+        super().__init__(argv)
+        
+        # Set application name and organization
+        self.setApplicationName("DocWhisperer")
+        self.setOrganizationName("DocWhisperer")
+        
+        # Initialize NSApplication for proper macOS behavior
+        NSApplication.sharedApplication()
+        info = NSBundle.mainBundle().infoDictionary()
+        info["LSBackgroundOnly"] = "1"
+        NSApp.setActivationPolicy_(1)
         
         # Create application support directory
         os.makedirs(os.path.expanduser("~/Library/Application Support/DocWhisperer"), exist_ok=True)
         
-        # Initialize QApplication
-        self.app = QApplication(sys.argv)
-        
-        # Show splash screen
-        splash_pix = QPixmap('splash.png')  # Path to your splash image
-        self.splash = QSplashScreen(splash_pix, Qt.WindowType.WindowStaysOnTopHint)
+        # Create and show splash screen
+        self.splash = DynamicSplashScreen()
         self.splash.show()
         
-        # Initialize RAG system in a separate thread
+        # Process events to ensure splash is shown
+        self.processEvents()
+        
+        # Initialize system tray
+        self.init_tray()
+        
+        # Initialize RAG system in separate thread
         self.thread = QThread()
         self.worker = RAGSystemWorker()
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
+        self.worker.progress.connect(self.update_splash_message)
         self.worker.finished.connect(self.on_rag_system_initialized)
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
-        self.thread.start()
         
+        # Start the initialization process
+        QTimer.singleShot(1000, self.thread.start)
+        
+        # Prevent application from quitting when last window is closed
+        self.setQuitOnLastWindowClosed(False)
+
+    def init_tray(self):
+        # Create system tray icon
+        self.tray = QSystemTrayIcon(self)
+        icon = QIcon('src/icon.png')
+        self.tray.setIcon(icon)
+        self.tray.setVisible(True)
+        
+        # Create tray menu
+        self.tray_menu = QMenu()
+        
+        # Add menu items (they'll be connected later after RAG initialization)
+        self.ask_action = QAction("Ask Question")
+        self.add_docs_action = QAction("Add Documents")
+        self.about_action = QAction("About")
+        self.quit_action = QAction("Quit")
+        
+        self.tray_menu.addAction(self.ask_action)
+        self.tray_menu.addAction(self.add_docs_action)
+        self.tray_menu.addSeparator()
+        self.tray_menu.addAction(self.about_action)
+        self.tray_menu.addAction(self.quit_action)
+        
+        # Connect quit action
+        self.quit_action.triggered.connect(self.quit)
+        
+        # Set the menu
+        self.tray.setContextMenu(self.tray_menu)
+        
+        # Show the icon
+        self.tray.show()
+
+    def update_splash_message(self, message):
+        self.splash.update_message(message)
+        self.processEvents()
+
     def on_rag_system_initialized(self, rag_system):
         self.rag_system = rag_system
-        self.query_window = QueryWindow(self.rag_system)
+        self.query_window = QueryWindow(rag_system)
         
-        # Set up menu items
-        self.menu.clear()
-        self.menu = [
-            rumps.MenuItem("Ask Question", callback=self.show_query_window),
-            rumps.MenuItem("Add Documents", callback=self.add_documents),
-            # rumps.MenuItem("List Documents", callback=self.list_documents),
-            None,  # Separator
-            rumps.MenuItem("About", callback=self.show_about),
-            rumps.MenuItem("Quit", callback=self.quit_app)  # New Quit menu item
-        ]
+        # Connect menu actions
+        self.ask_action.triggered.connect(self.show_query_window)
+        self.add_docs_action.triggered.connect(self.add_documents)
+        self.about_action.triggered.connect(self.show_about)
         
         # Close splash screen
-        self.splash.close()
+        self.splash.finish(self.query_window)
         
-    @rumps.clicked("Ask Question")
-    def show_query_window(self, _):
-        self.query_window.show()
-        
-    @rumps.clicked("Add Documents")
-    def add_documents(self, _):
-        # Create a file dialog
+        # Show notification that app is ready
+        self.tray.showMessage(
+            "DocWhisperer",
+            "Application is ready to use",
+            QSystemTrayIcon.MessageIcon.Information
+        )
+
+    def show_query_window(self):
+        if self.query_window:
+            self.query_window.show()
+            self.query_window.raise_()
+            self.query_window.activateWindow()
+
+    def add_documents(self):
+        if not self.query_window:
+            return
+            
         dialog = QFileDialog()
         dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
         dialog.setNameFilter("PDF files (*.pdf)")
@@ -163,7 +244,7 @@ class DocWhispererApp(rumps.App):
         if dialog.exec():
             filenames = dialog.selectedFiles()
             self.process_documents(filenames)
-            
+
     def process_documents(self, file_paths):
         try:
             documents = []
@@ -174,40 +255,23 @@ class DocWhispererApp(rumps.App):
                     
             if documents:
                 self.rag_system.add_documents(documents)
-                rumps.notification(
-                    title="DocWhisperer",
-                    subtitle="Documents Added",
-                    message=f"Successfully processed {len(documents)} documents"
+                self.tray.showMessage(
+                    "DocWhisperer",
+                    f"Successfully processed {len(documents)} documents",
+                    QSystemTrayIcon.MessageIcon.Information
                 )
         except Exception as e:
-            rumps.notification(
-                title="DocWhisperer",
-                subtitle="Error",
-                message=f"Error processing documents: {str(e)}"
+            self.tray.showMessage(
+                "DocWhisperer",
+                f"Error processing documents: {str(e)}",
+                QSystemTrayIcon.MessageIcon.Critical
             )
 
-    @rumps.clicked("List Documents")
-    def list_documents(self, _):
-        try:
-            num_documents = self.rag_system.get_document_count()  # Assuming this method exists
-            rumps.notification(
-                title="DocWhisperer",
-                subtitle="Documents Available",
-                message=f"There are {num_documents} documents available."
-            )
-        except Exception as e:
-            rumps.notification(
-                title="DocWhisperer",
-                subtitle="Error",
-                message=f"Error retrieving document count: {str(e)}"
-            )
-            
-    @rumps.clicked("About")
-    def show_about(self, _):
-        rumps.alert(
-            title="About DocWhisperer",
-            icon_path="icon.png",
-            message="DocWhisperer is an intelligent document assistant that helps you interact with your PDF documents using advanced AI technology."
+    def show_about(self):
+        self.tray.showMessage(
+            "About DocWhisperer",
+            "DocWhisperer is an intelligent document assistant that helps you interact with your PDF documents using advanced AI technology.",
+            QSystemTrayIcon.MessageIcon.Information
         )
 
     def quit_app(self, _):
@@ -215,13 +279,34 @@ class DocWhispererApp(rumps.App):
 
 class RAGSystemWorker(QObject):
     finished = pyqtSignal(object)
+    progress = pyqtSignal(str)
 
     def run(self):
-        rag_system = RAGSystem(db_path=os.path.expanduser("~/Library/Application Support/DocWhisperer/rag_cache.db"))
-        self.finished.emit(rag_system)
+        try:
+            # Emit progress updates during initialization
+            self.progress.emit("Loading model...")
+            
+            # Initialize RAG system
+            rag_system = RAGSystem()
+            
+            # Update progress for different initialization steps
+            self.progress.emit("Loading document cache...")
+            rag_system._load_existing_document_cache(db_path=os.path.expanduser("~/Library/Application Support/DocWhisperer/rag_cache.db"))
+            
+            
+            self.progress.emit("Load existing embeddings from storage into FAISS index...")
+            rag_system._load_existing_embeddings()
+            
+            self.progress.emit("Ready!")
+            self.finished.emit(rag_system)
+            
+        except Exception as e:
+            self.progress.emit(f"Error during initialization: {str(e)}")
 
 def main():
-    DocWhispererApp().run()
+    # Create and run the application
+    app = DocWhispererApp(sys.argv)
+    return app.exec()
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

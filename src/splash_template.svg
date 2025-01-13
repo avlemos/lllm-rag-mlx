@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <!-- Background with gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2C3E50" />
+      <stop offset="100%" style="stop-color:#3498DB" />
+    </linearGradient>
+  </defs>
+  <rect width="600" height="400" fill="url(#bgGradient)" />
+  
+  <!-- Document icon -->
+  <g transform="translate(240,100)">
+    <!-- Base document -->
+    <path d="M20 0 L100 0 L100 120 L20 120 Z" 
+          fill="#fff" 
+          opacity="0.9"/>
+    <!-- Folded corner -->
+    <path d="M80 0 L100 20 L80 20 Z" 
+          fill="#eee"/>
+    <!-- Lines representing text -->
+    <rect x="35" y="30" width="50" height="4" fill="#3498DB" opacity="0.7"/>
+    <rect x="35" y="45" width="40" height="4" fill="#3498DB" opacity="0.7"/>
+    <rect x="35" y="60" width="45" height="4" fill="#3498DB" opacity="0.7"/>
+    <rect x="35" y="75" width="35" height="4" fill="#3498DB" opacity="0.7"/>
+  </g>
+  
+  <!-- Magnifying glass -->
+  <g transform="translate(290,130) rotate(-30)">
+    <!-- Glass -->
+    <circle cx="0" cy="0" r="25" 
+            fill="none" 
+            stroke="#fff" 
+            stroke-width="8"/>
+    <!-- Handle -->
+    <line x1="20" y1="20" x2="45" y2="45" 
+          stroke="#fff" 
+          stroke-width="8" 
+          stroke-linecap="round"/>
+  </g>
+  
+  <!-- App name -->
+  <text x="300" y="280" 
+        text-anchor="middle" 
+        fill="#fff" 
+        style="font-family: Arial, sans-serif; font-size: 36px; font-weight: bold">
+    DocWhisperer
+  </text>
+  
+  <!-- Loading text - with id for easy updating -->
+  <text id="loading-text" x="300" y="320" 
+        text-anchor="middle" 
+        fill="#fff" 
+        style="font-family: Arial, sans-serif; font-size: 18px">
+    {loading_text}
+  </text>
+</svg>

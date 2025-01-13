@@ -176,9 +176,6 @@ class RAGSystem:
         # Initialize sentence transformer for embeddings
         self.encoder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
         
-        # Initialize document store
-        self.store = DocumentStore(db_path)
-        
         # Initialize FAISS index
         self.dimension = 384  # embedding dimension for MiniLM
         self.index = faiss.IndexFlatL2(self.dimension)
@@ -187,7 +184,12 @@ class RAGSystem:
         self.documents: List[str] = []
         
         # Load existing embeddings
-        self._load_existing_embeddings()
+        # self._load_existing_embeddings()
+    
+    def _load_existing_document_cache(self, db_path: str = "rag_cache.db"):
+        """Load existing document cache from storage"""
+        # Initialize document store
+        self.store = DocumentStore(db_path)
         
     def _load_existing_embeddings(self):
         """Load existing embeddings from storage into FAISS index"""
