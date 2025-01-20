@@ -32,9 +32,20 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
+or in Windows
+```bash
+python -m venv .venv
+source .venv/Scripts/activate
+```
+
 3. Install required packages:
 ```bash
 pip install -r requirements.txt
+```
+
+or in Windows
+```bash
+pip install -r requirements-win.txt
 ```
 
 ## Project Structure

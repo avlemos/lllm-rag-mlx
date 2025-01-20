@@ -1,4 +1,9 @@
-from mlx_lm import load, generate
+import sys
+
+if sys.platform == 'mac':
+    from mlx_lm import load, generate
+if sys.platform == 'win32':
+    from transformers import pipeline
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Tuple
@@ -170,9 +175,11 @@ class DocumentStore:
 
 class RAGSystem:
     def __init__(self, model_name: str = "mlx-community/Llama-3.2-3B-Instruct-4bit", db_path: str = "rag_cache.db"):
-        # Load MLX model and tokenizer
-        print("Loading MLX model and tokenizer...")
-        self.model, self.tokenizer = load(model_name)
+        
+        if sys.platform == 'mac':
+            # Load MLX model and tokenizer
+            print("Loading MLX model and tokenizer...")
+            self.model, self.tokenizer = load(model_name)
         
         # Initialize sentence transformer for embeddings
         print("Initializing SentenceTransformer...")
@@ -221,10 +228,11 @@ class RAGSystem:
         folder_path = os.path.normpath(os.path.abspath(folder_path))
         pdf_files = glob.glob(os.path.join(folder_path, "*.pdf"))
         
-        if not pdf_files:
-            raise ValueError(f"No PDF files found in {folder_path}")
-            
         documents = []
+
+        if not pdf_files:
+            # print(f"No PDF files found in {folder_path}")
+            documents
         
         print(f"\nFound {len(pdf_files)} PDF files in {folder_path}")
         
@@ -309,22 +317,41 @@ class RAGSystem:
     
     def generate_response(self, query: str, k: int = 3) -> str:
         """Generate a response using RAG"""
-        relevant_docs = self.retrieve(query, k)
-        
-        context = "\n".join(relevant_docs)
-        prompt = f"""Context: {context}
 
-Question: {query}
-
-Based on the context provided, please answer the question:"""
+        relevant_docs = []
+        try:
+            relevant_docs = self.retrieve(query, k)
+        except Exception as e:
+            print("No documents found for the query.")
         
-        if hasattr(self.tokenizer, "apply_chat_template") and self.tokenizer.chat_template is not None:
-            messages = [{"role": "user", "content": prompt}]
-            prompt = self.tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
-            )
-            
-        return generate(self.model, self.tokenizer, prompt=prompt, verbose=True)
+        if relevant_docs.__sizeof__() != 0:
+            context = "\n".join(relevant_docs)
+            prompt = f"""Context: {context}
+
+    Question: {query}
+
+    Based on the context provided, please answer the question:"""
+
+        else:
+            prompt = query
+
+        if sys.platform == 'mac':
+            if hasattr(self.tokenizer, "apply_chat_template") and self.tokenizer.chat_template is not None:
+                messages = [{"role": "user", "content": prompt}]
+                prompt = self.tokenizer.apply_chat_template(
+                    messages, tokenize=False, add_generation_prompt=True
+                )
+                
+            return generate(self.model, self.tokenizer, prompt=prompt, verbose=True)
+        
+        if sys.platform == 'win32':
+            # Use a pipeline as a high-level helper
+
+            messages = [
+                {"role": "user", "content": prompt},
+            ]
+            pipe = pipeline("text-generation", model="rhysjones/phi-2-orange-v2")
+            return pipe(messages)[0]['generated_text'][1]['content']
 
 # Example usage
 def main():

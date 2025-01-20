@@ -6,8 +6,9 @@ from PyQt6.QtGui import QPixmap, QPainter, QIcon, QAction
 from PyQt6.QtSvg import QSvgRenderer
 from rag_system import RAGSystem
 import threading
-from Foundation import NSBundle
-from AppKit import NSApplication, NSApp
+if sys.platform == 'mac':
+    from Foundation import NSBundle
+    from AppKit import NSApplication, NSApp
 
 # Path to the model cache directory
 cache_dir = os.path.expanduser("~/.cache/huggingface/hub/models--mlx-community--Llama-3.2-3B-Instruct-4bit/blobs")
@@ -155,14 +156,15 @@ class DocWhispererApp(QApplication):
         self.setApplicationName("DocWhisperer")
         self.setOrganizationName("DocWhisperer")
         
-        # Initialize NSApplication for proper macOS behavior
-        NSApplication.sharedApplication()
-        info = NSBundle.mainBundle().infoDictionary()
-        info["LSBackgroundOnly"] = "1"
-        NSApp.setActivationPolicy_(1)
-        
-        # Create application support directory
-        os.makedirs(os.path.expanduser("~/Library/Application Support/DocWhisperer"), exist_ok=True)
+        if sys.platform == 'mac':
+            # Initialize NSApplication for proper macOS behavior
+            NSApplication.sharedApplication()
+            info = NSBundle.mainBundle().infoDictionary()
+            info["LSBackgroundOnly"] = "1"
+            NSApp.setActivationPolicy_(1)
+            
+            # Create application support directory
+            os.makedirs(os.path.expanduser("~/Library/Application Support/DocWhisperer"), exist_ok=True)
         
         # Create and show splash screen
         self.splash = DynamicSplashScreen()
