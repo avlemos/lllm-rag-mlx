@@ -310,44 +310,47 @@ class RAGSystemWorker(QObject):
 
 
         # Start monitoring in a separate thread
-        if not os.path.exists(cache_dir):
-            self._running = True
-            self.monitoring_thread = threading.Thread(target=self.monitor_progress, args=(model_path,))
-            self.monitoring_thread.start()  # Start the monitor in a separate thread
+        # if not os.path.exists(cache_dir):
+        #     self._running = True
+        #     self.monitoring_thread = threading.Thread(target=self.monitor_progress, args=(model_path,))
+        #     self.monitoring_thread.start()  # Start the monitor in a separate thread
 
-        try:
-            # Emit initial progress
-            if not os.path.exists(cache_dir):
-                print("Downloading & Loading the model...")
-                self.progress.emit("Downloading & Loading the model...")
-            else:
-                print("Loading the model...")
-                self.progress.emit("Loading the model...")
+        # try:
+        #     # Emit initial progress
+        #     if not os.path.exists(cache_dir):
+        #         print("Downloading & Loading the model...")
+        #         self.progress.emit("Downloading & Loading the model...")
+        #     else:
+        #         print("Loading the model...")
+        #         self.progress.emit("Loading the model...")
 
-            # Initialize RAG system
-            print("Initializing RAG system...")
-            rag_system = RAGSystem()
+        # Initialize RAG system
+        print("Initializing RAG system...")
+        rag_system = RAGSystem()
 
-            # Emit progress updates during initialization
-            self.progress.emit("Loading document cache...")
+        # Emit progress updates during initialization
+        self.progress.emit("Loading document cache...")
+        if sys.platform == 'mac':
             rag_system._load_existing_document_cache(
                 db_path=os.path.expanduser("~/Library/Application Support/DocWhisperer/rag_cache.db")
             )
+        else:
+            rag_system._load_existing_document_cache()
 
-            self.progress.emit("Load existing embeddings from storage into FAISS index...")
-            rag_system._load_existing_embeddings()
+        self.progress.emit("Load existing embeddings from storage into FAISS index...")
+        rag_system._load_existing_embeddings()
 
-            # Notify completion
-            self.progress.emit("Ready!")
-            self.finished.emit(rag_system)
+        # Notify completion
+        self.progress.emit("Ready!")
+        self.finished.emit(rag_system)
 
-        except Exception as e:
-            self.progress.emit(f"Error during initialization: {str(e)}")
-        finally:
-            # Stop the monitoring thread
-            self._running = False
-            if hasattr(self, "monitoring_thread") and self.monitoring_thread is not None:
-                self.monitoring_thread.join()  # Ensure the thread stops gracefully
+        # except Exception as e:
+        #     self.progress.emit(f"Error during initialization: {str(e)}")
+        # finally:
+        #     # Stop the monitoring thread
+        #     self._running = False
+        #     if hasattr(self, "monitoring_thread") and self.monitoring_thread is not None:
+        #         self.monitoring_thread.join()  # Ensure the thread stops gracefully
 
     def monitor_progress(self, model_path):
         """Monitors model download progress and emits updates."""
