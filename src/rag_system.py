@@ -15,6 +15,7 @@ import sqlite3
 import hashlib
 from datetime import datetime
 import json
+import time
 
 class DocumentStore:
     def __init__(self, db_path: str = "rag_cache.db"):
@@ -349,9 +350,15 @@ class RAGSystem:
 
             messages = [
                 {"role": "user", "content": prompt},
+                {"role": "system", "content": "you are a helpful assistant. you never reply with more than 2 sentences even if asked to."}
             ]
             pipe = pipeline("text-generation", model="rhysjones/phi-2-orange-v2")
-            return pipe(messages)[0]['generated_text'][1]['content']
+            # Record the start time
+            start_time = time.time()
+            str = pipe(messages, max_new_tokens= 50)[0]['generated_text'][-1]['content']
+            elapsed_time = time.time() - start_time
+            print(f"Time taken: {elapsed_time:.4f} seconds")
+            return str
 
 # Example usage
 def main():
@@ -359,7 +366,7 @@ def main():
         # Initialize RAG system
         rag = RAGSystem(db_path="rag_cache.db")
         rag._load_existing_document_cache()
-        rag._load_existing_embeddings
+        rag._load_existing_embeddings()
         
         # Load PDFs from folder
         pdf_folder = "../data/"  # Update this path
