@@ -6,7 +6,7 @@ from PyQt6.QtGui import QPixmap, QPainter, QIcon, QAction
 from PyQt6.QtSvg import QSvgRenderer
 from rag_system import RAGSystem
 import threading
-if sys.platform == 'mac':
+if sys.platform == 'darwin':
     from Foundation import NSBundle
     from AppKit import NSApplication, NSApp
 
@@ -113,6 +113,7 @@ class QueryWindow(QMainWindow):
 
     def handle_query(self):
         query = self.query_input.toPlainText()
+        print("query:", query)
         if query:
             if self.ignore_documents_checkbox.isChecked():
                 query += " sorry, ignore any provided context, just provide a general answer"
@@ -139,6 +140,7 @@ class QueryWindow(QMainWindow):
             self.thread.start()
 
     def update_response(self, response):
+        print("response:", response)
         self.response_display.setPlainText(self.remove_prefix(response))
         self.submit_button.setEnabled(True)
         
@@ -156,7 +158,7 @@ class DocWhispererApp(QApplication):
         self.setApplicationName("DocWhisperer")
         self.setOrganizationName("DocWhisperer")
         
-        if sys.platform == 'mac':
+        if sys.platform == 'darwin':
             # Initialize NSApplication for proper macOS behavior
             NSApplication.sharedApplication()
             info = NSBundle.mainBundle().infoDictionary()

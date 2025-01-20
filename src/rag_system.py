@@ -1,6 +1,6 @@
 import sys
 
-if sys.platform == 'mac':
+if sys.platform == 'darwin':
     from mlx_lm import load, generate
 if sys.platform == 'win32':
     from transformers import pipeline
@@ -177,7 +177,7 @@ class DocumentStore:
 class RAGSystem:
     def __init__(self, model_name: str = "mlx-community/Llama-3.2-3B-Instruct-4bit", db_path: str = "rag_cache.db"):
         
-        if sys.platform == 'mac':
+        if sys.platform == 'darwin':
             # Load MLX model and tokenizer
             print("Loading MLX model and tokenizer...")
             self.model, self.tokenizer = load(model_name)
@@ -336,7 +336,8 @@ class RAGSystem:
         else:
             prompt = query
 
-        if sys.platform == 'mac':
+        
+        if sys.platform == 'darwin':
             if hasattr(self.tokenizer, "apply_chat_template") and self.tokenizer.chat_template is not None:
                 messages = [{"role": "user", "content": prompt}]
                 prompt = self.tokenizer.apply_chat_template(
